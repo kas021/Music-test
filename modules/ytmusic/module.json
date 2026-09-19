@@ -6,7 +6,7 @@
   "contentType": "music",
   "contractVersion": 4,
   "formatVersion": 3,
-  "moduleVersion": "1.0.1",
+  "moduleVersion": "1.0.2",
   "moduleFamilyId": "synthetiq_ytmusic_direct",
   "config": {
     "runtime": {"mode": "local", "entry": "index.js"},

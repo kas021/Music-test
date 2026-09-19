@@ -25,6 +25,9 @@
   var LOG_PREFIX = '[synthetiq_ytmusic_direct]';
   var YTM_BASE = 'https://music.youtube.com';
   var FAMILY = 'synthetiq_ytmusic_direct';
+  // Bounded, short-lived source metadata keyed by exact YouTube video ID.
+  // Audio URLs and request headers never enter this cache.
+  var catalogueMetadata = new Map();
 
   var VISITOR_DATA_TTL_MS = 20 * 60 * 1000;
   var cachedVisitorData = null;
@@ -234,6 +237,42 @@
     return null;
   }
 
+  // Verify playback ID before using source catalogue presentation metadata.
+  // YouTube player author can be an uploader (e.g. "Release"), not the artist.
+  function recordingMetadata(data, trackId) {
+    var details = data.videoDetails || {};
+    if (details.videoId !== trackId || !details.title || !details.author) {
+      var error = new Error('Recording metadata not verified.');
+      error.playbackBlocked = true;
+      throw error;
+    }
+    var metadata = {
+      title: details.title,
+      // YouTube's auto-generated music channels append a presentation label.
+      artist: details.author.replace(/ - Topic$/, ''),
+      artwork: bestThumbnail((details.thumbnail || {}).thumbnails),
+      durationSeconds: Number(details.lengthSeconds) || undefined
+    };
+    var saved = catalogueMetadata.get(trackId);
+    if (saved && Date.now() - saved.at < 30 * 60 * 1000) {
+      var item = saved.item;
+      if (item.durationSeconds && metadata.durationSeconds && Math.abs(item.durationSeconds - metadata.durationSeconds) > 3) {
+        var mismatch = new Error('Recording duration does not match catalogue.');
+        mismatch.playbackBlocked = true;
+        throw mismatch;
+      }
+      metadata.title = item.title;
+      metadata.artist = item.artist;
+      metadata.album = item.album;
+    }
+    return metadata;
+  }
+
+  function withRecording(result, metadata) {
+    if (!result) return null;
+    return Object.assign(result, metadata);
+  }
+
   function audioDirectResult(picked, quality, extra) {
     if (!picked || !picked.url) return null;
     var result = {
@@ -261,18 +300,20 @@
       if (!data.videoDetails || data.videoDetails.videoId !== trackId) throw Object.assign(new Error('Recording identity not verified.'), {playbackBlocked: true});
       var sd = data.streamingData || {};
       var picked = pickAudioFormat(sd, quality);
-      var direct = audioDirectResult(picked, quality, extra);
+      var metadata = recordingMetadata(data, trackId);
+      var direct = audioDirectResult(picked, quality, metadata);
       if (direct) return direct;
       var hls = hlsResult(sd, quality);
-      if (hls) return hls;
+      if (hls) return withRecording(hls, metadata);
       return callPlayer(trackId, ANDROID_CONTEXT, ANDROID_USER_AGENT).then(function (data2) {
         if (!data2.videoDetails || data2.videoDetails.videoId !== trackId) throw Object.assign(new Error('Recording identity not verified.'), {playbackBlocked: true});
         var sd2 = data2.streamingData || {};
         var picked2 = pickAudioFormat(sd2, quality);
-        var direct2 = audioDirectResult(picked2, quality, extra);
+        var metadata2 = recordingMetadata(data2, trackId);
+        var direct2 = audioDirectResult(picked2, quality, metadata2);
         if (direct2) return direct2;
         var hls2 = hlsResult(sd2, quality);
-        if (hls2) return hls2;
+        if (hls2) return withRecording(hls2, metadata2);
         throw new Error('No playable audio format was returned for this track.');
       });
     }).catch(function (err) {
@@ -282,10 +323,11 @@
         if (!data3.videoDetails || data3.videoDetails.videoId !== trackId) throw new Error('Recording identity not verified.');
         var sd3 = data3.streamingData || {};
         var picked3 = pickAudioFormat(sd3, quality);
-        var direct3 = audioDirectResult(picked3, quality, extra);
+        var metadata3 = recordingMetadata(data3, trackId);
+        var direct3 = audioDirectResult(picked3, quality, metadata3);
         if (direct3) return direct3;
         var hls3 = hlsResult(sd3, quality);
-        if (hls3) return hls3;
+        if (hls3) return withRecording(hls3, metadata3);
         throw err;
       });
     });
@@ -376,7 +418,13 @@
           var renderer = shelf.contents[c] && shelf.contents[c].musicResponsiveListItemRenderer;
           if (!renderer) continue;
           var item = itemFromRenderer(renderer);
-          if (item) items.push(item);
+          if (item) {
+            var videoId = trackIdFromInput(item.id);
+            catalogueMetadata.delete(videoId);
+            catalogueMetadata.set(videoId, {item: item, at: Date.now()});
+            while (catalogueMetadata.size > 120) catalogueMetadata.delete(catalogueMetadata.keys().next().value);
+            items.push(item);
+          }
         }
       }
       return ok(items);
@@ -427,4 +475,3 @@
   globalThis.extractTracks = extractTracks;
   globalThis.extractAudioUrl = extractAudioUrl;
 })();
-

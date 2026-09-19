@@ -1,5 +1,10 @@
 # Music test — YouTube-only prototype
 
+Latest: 1.0.2 fixes missing playback metadata that caused the app to reject
+all resolved tracks from 1.0.1. Check source updates, then search again and
+select a fresh result. Physical playback still requires owner verification.
+Album browsing remains unsupported. See TEST_RESULTS.md for remaining limits.
+
 In Synthetiq Music, open Settings → Sources → add a GitHub source:
 
 https://github.com/kas021/Music-test

@@ -37,11 +37,14 @@ test('wrong recording is rejected',async()=>{
  assert.equal((await ctx.extractAudioUrl(id)).ok,false);
 });
 test('matching recording resolves ephemeral audio with headers',async()=>{
- const {ctx}=runtime(()=>({playabilityStatus:{status:'OK'},videoDetails:{videoId:id},streamingData:{adaptiveFormats:[{url:'https://example.com/audio',mimeType:'audio/mp4',bitrate:128000}]}}));
+ const {ctx}=runtime(()=>({playabilityStatus:{status:'OK'},videoDetails:{videoId:id,title:'Song',author:'Artist',lengthSeconds:'210'},streamingData:{adaptiveFormats:[{url:'https://example.com/audio',mimeType:'audio/mp4',bitrate:128000}]}}));
  const result=await ctx.extractAudioUrl(id);
  assert.equal(result.ok,true);
  assert.equal(decode(result).url,'https://example.com/audio');
  assert.deepEqual(decode(result).headers,{});
+ assert.equal(decode(result).title,'Song');
+ assert.equal(decode(result).artist,'Artist');
+ assert.equal(decode(result).durationSeconds,210);
 });
 test('details never return stream URLs',async()=>{
  const {ctx}=runtime(()=>({playabilityStatus:{status:'OK'},videoDetails:{videoId:id,title:'日本語',author:'Artist'},streamingData:{hlsManifestUrl:'https://example.com/private'}}));
@@ -70,4 +73,16 @@ test('pagination and unsupported album listing are honest and bounded',async()=>
 });
 test('no key/token placeholders or access confirmation flags shipped',()=>{
  assert.equal(/AIza|__YTM_API_KEY__|USER_TOKEN|racyCheckOk|contentCheckOk/.test(code),false);
+});
+test('HLS fallback carries verified recording metadata too',async()=>{
+ const {ctx}=runtime(()=>({playabilityStatus:{status:'OK'},videoDetails:{videoId:id,title:'Song',author:'Artist - Topic',lengthSeconds:'210'},streamingData:{hlsManifestUrl:'https://example.com/playlist.m3u8'}}));
+ const result=decode(await ctx.extractAudioUrl(id));
+ assert.equal(result.title,'Song');
+ assert.equal(result.artist,'Artist');
+ assert.equal(result.durationSeconds,210);
+});
+test('missing player identity metadata fails closed',async()=>{
+ const {ctx,calls}=runtime(()=>({playabilityStatus:{status:'OK'},videoDetails:{videoId:id},streamingData:{adaptiveFormats:[{url:'https://example.com/audio',mimeType:'audio/mp4'}]}}));
+ assert.equal((await ctx.extractAudioUrl(id)).ok,false);
+ assert.equal(calls.length,1);
 });
