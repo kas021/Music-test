@@ -1,0 +1,12 @@
+{
+  "modules": [
+    {
+      "moduleId": "synthetiq_ytmusic_direct",
+      "name": "YT Music Direct (Test)",
+      "contentType": "music",
+      "version": "1.0.1",
+      "file": "synthetiq_ytmusic_direct-1.0.1.zip",
+      "sha256": "934946c9aa73e88fe4e45bc6ed1e93bb3b22c555879d6c77efe3ca575492b7bb"
+    }
+  ]
+}

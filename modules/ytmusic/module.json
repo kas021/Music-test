@@ -1,0 +1,17 @@
+{
+  "id": "synthetiq-ytmusic-direct-v1",
+  "name": "YT Music Direct (Test)",
+  "description": "Experimental song search and streaming. No albums, radio or downloads.",
+  "type": "client",
+  "contentType": "music",
+  "contractVersion": 4,
+  "formatVersion": 3,
+  "moduleVersion": "1.0.1",
+  "moduleFamilyId": "synthetiq_ytmusic_direct",
+  "config": {
+    "runtime": {"mode": "local", "entry": "index.js"},
+    "caps": {"timeoutMs": 20000, "maxConcurrentRequests": 1},
+    "playbackMode": "full",
+    "allowOfflineDownload": false
+  }
+}
